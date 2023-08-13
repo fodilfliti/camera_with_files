@@ -1,19 +1,21 @@
 library camera_with_files;
 
 import 'dart:async';
+import 'dart:developer';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_sliding_up_panel/flutter_sliding_up_panel.dart';
-import 'package:image_gallery_saver/image_gallery_saver.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:photo_gallery/photo_gallery.dart';
 import 'package:image_picker/image_picker.dart';
 import "package:intl/intl.dart";
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter_exif_rotation/flutter_exif_rotation.dart';
 
 class CameraApp extends StatefulWidget {
   final bool isMultiple;
@@ -62,19 +64,29 @@ class CameraAppState extends State<CameraApp> {
   @override
   void initState() {
     super.initState();
-    cameraLoad();
+    _promptPermissionSetting().then((value) {
+      if (value) {
+        cameraLoad();
+      }
+      setState(() {});
+    });
   }
 
   cameraLoad() async {
     cameras = await availableCameras();
-    controller = CameraController(cameras[0], ResolutionPreset.max,
-        imageFormatGroup: Platform.isIOS ? ImageFormatGroup.bgra8888 : null);
+    controller = CameraController(
+      cameras[0],
+      ResolutionPreset.high,
+      imageFormatGroup: Platform.isIOS ? ImageFormatGroup.bgra8888 : null,
+    );
+
     controller!.initialize().then((_) {
       if (!mounted) {
         return;
       }
+      controller!.setFlashMode(FlashMode.off);
       _promptPermissionSetting().then((_) {
-        if (_) {
+        if (true) {
           loadImages();
         }
         setState(() {});
@@ -127,10 +139,20 @@ class CameraAppState extends State<CameraApp> {
       PermissionStatus status = await Permission.storage.request();
       PermissionStatus status2 = await Permission.photos.request();
       PermissionStatus status3 = await Permission.mediaLibrary.request();
-      return status.isGranted && status2.isGranted && status3.isGranted;
+      final PermissionStatus status4 = await Permission.camera.request();
+
+      return //status.isGranted &&
+          status4.isGranted; //&& status2.isGranted && status3.isGranted;
     } else if (Platform.isAndroid) {
+      final PermissionStatus status4 = await Permission.camera.request();
+
       PermissionStatus status = await Permission.storage.request();
-      return status.isGranted;
+      PermissionStatus status2 = await Permission.photos.request();
+      PermissionStatus status3 = await Permission.mediaLibrary.request();
+      return status4.isGranted &&
+          // status.isGranted &&
+          status2.isGranted &&
+          status3.isGranted;
     }
     return false;
   }
@@ -147,8 +169,19 @@ class CameraAppState extends State<CameraApp> {
       var data = await element.listMedia();
       imageMedium.addAll(data.items);
     }
-    var dataB = await rootBundle.load('assets/ss.png');
-    bytes = dataB.buffer.asUint8List(dataB.offsetInBytes, dataB.lengthInBytes);
+    final albums = await PhotoGallery.listAlbums(
+      mediumType: MediumType.image,
+    );
+    final res = await Future.wait(albums.map((e) => e.listMedia()));
+    final index = res.indexWhere((e) => e.album.name == 'All');
+    if (index != -1) imageMedium.addAll(res[index].items);
+    if (index == -1) {
+      for (var e in res) {
+        imageMedium.addAll(e.items);
+      }
+    }
+    // var dataB = await rootBundle.load('assets/ss.png');
+    // bytes = dataB.buffer.asUint8List(dataB.offsetInBytes, dataB.lengthInBytes);
     if (pageCount2 * (pageIndex2) > imageMedium.length) {
       //fix here
       count2 = imageMedium.length;
@@ -161,12 +194,15 @@ class CameraAppState extends State<CameraApp> {
     } else {
       count = pageCount * (pageIndex);
     }
-    setState(() {});
+
+    setState(() {
+      imageMedium = imageMedium;
+    });
   }
 
   @override
   void dispose() {
-    controller!.dispose();
+    controller?.dispose();
     super.dispose();
   }
 
@@ -176,10 +212,12 @@ class CameraAppState extends State<CameraApp> {
       return Container();
     }
     var camera = controller!.value;
-    final size = MediaQuery.of(context).size;
+    var size = MediaQuery.of(context).size;
     var scale = 0.0;
     try {
-      scale = size.aspectRatio * camera.aspectRatio;
+      scale = ScreenUtil().orientation == Orientation.landscape
+          ? (size.aspectRatio / camera.aspectRatio)
+          : (size.aspectRatio * camera.aspectRatio);
     } catch (e) {
       debugPrint(e.toString());
     }
@@ -189,140 +227,128 @@ class CameraAppState extends State<CameraApp> {
     if (!controller!.value.isInitialized) {
       return Container();
     }
-    return WillPopScope(
-      onWillPop: () {
-        if (panelController.status == SlidingUpPanelStatus.expanded) {
-          panelController.hide();
-          return Future.value(false);
-        }
-        return Future.value(true);
-      },
-      child: Stack(
-        children: [
-          Scaffold(
-            floatingActionButton: indexList.isNotEmpty
-                ? FloatingActionButton(
-                    onPressed: () async {
-                      for (var element in indexList) {
-                        File file =
-                            await imageMedium.elementAt(element).getFile();
-                        setState(() {
-                          results.add(file);
-                        });
-                      }
-                      compress(results);
+    return OrientationBuilder(builder: (context, orientation) {
+      return WillPopScope(
+        onWillPop: () {
+          if (panelController.status == SlidingUpPanelStatus.expanded) {
+            panelController.hide();
+            return Future.value(false);
+          }
+          return Future.value(true);
+        },
+        child: Stack(
+          children: [
+            Scaffold(
+              floatingActionButton: indexList.isNotEmpty
+                  ? FloatingActionButton(
+                      onPressed: () async {
+                        for (var element in indexList) {
+                          File file =
+                              await imageMedium.elementAt(element).getFile();
+                          setState(() {
+                            results.add(file);
+                          });
+                        }
+                        compress(results);
+                      },
+                      backgroundColor: Colors.greenAccent,
+                      child: const Icon(
+                        Icons.check,
+                        color: Colors.white,
+                      ),
+                    )
+                  : null,
+              body: Stack(
+                children: [
+                  GestureDetector(
+                    // onHorizontalDragStart: (detalis) {
+                    //   panelController.expand();
+                    //   //print(detalis.primaryVelocity);
+                    // },
+                    onVerticalDragStart: (e) {
+                      panelController.expand();
                     },
-                    backgroundColor: Colors.greenAccent,
-                    child: const Icon(
-                      Icons.check,
-                      color: Colors.white,
-                    ),
-                  )
-                : null,
-            body: Stack(
-              children: [
-                GestureDetector(
-                  // onHorizontalDragStart: (detalis) {
-                  //   panelController.expand();
-                  //   //print(detalis.primaryVelocity);
-                  // },
-                  onVerticalDragStart: (e) {
-                    panelController.expand();
-                  },
-                  child: Transform.scale(
-                    scale: scale,
-                    child: Center(
-                      child: CameraPreview(controller!),
+                    child: Transform.scale(
+                      scale: scale,
+                      child: Center(
+                        child: CameraPreview(
+                          controller!,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Container(
-                    width: MediaQuery.of(context).size.width,
-                    height: 190,
-                    color: Colors.transparent,
-                    child: Column(
-                      children: [
-                        if (!Platform.isIOS)
-                          Column(
-                            children: [
-                              SizedBox(
-                                width: MediaQuery.of(context).size.width,
-                                child: GestureDetector(
-                                  onHorizontalDragStart: (detalis) {
-                                    if (kIsWeb) {
-                                      return;
-                                    }
-                                    panelController.expand();
-                                    //print(detalis.primaryVelocity);
-                                  },
-                                  onTap: () async {
-                                    if (kIsWeb) {
-                                      final ImagePicker picker = ImagePicker();
-                                      if (widget.isMultiple) {
-                                        List<XFile>? images =
-                                            await picker.pickMultiImage();
-                                        List<File> file = [];
-                                        for (var element in images) {
-                                          file.add(File(element.path));
-                                        }
-                                        compress(file);
-                                      } else {
-                                        XFile? image = await picker.pickImage(
-                                            source: ImageSource.gallery);
-                                        File file = File(image!.path);
-                                        compress([file]);
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Container(
+                      width: MediaQuery.of(context).size.width,
+                      height: 190,
+                      color: Colors.transparent,
+                      child: Column(
+                        children: [
+                          if (!Platform.isIOS)
+                            Column(
+                              children: [
+                                SizedBox(
+                                  width: MediaQuery.of(context).size.width,
+                                  child: GestureDetector(
+                                    onHorizontalDragStart: (detalis) {
+                                      if (kIsWeb) {
+                                        return;
                                       }
-                                      return;
-                                    }
-                                    panelController.expand();
-                                  },
-                                  child: const Icon(
-                                    Icons.arrow_drop_up_outlined,
-                                    color: Colors.white,
+                                      panelController.expand();
+                                      //print(detalis.primaryVelocity);
+                                    },
+                                    onTap: () async {
+                                      if (kIsWeb) {
+                                        final ImagePicker picker =
+                                            ImagePicker();
+                                        if (widget.isMultiple) {
+                                          List<XFile>? images =
+                                              await picker.pickMultiImage();
+                                          List<File> file = [];
+                                          for (var element in images) {
+                                            file.add(File(element.path));
+                                          }
+                                          compress(file);
+                                        } else {
+                                          XFile? image = await picker.pickImage(
+                                              source: ImageSource.gallery);
+                                          File file = File(image!.path);
+                                          compress([file]);
+                                        }
+                                        return;
+                                      }
+                                      panelController.expand();
+                                    },
+                                    child: const Icon(
+                                      Icons.arrow_drop_up_outlined,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                 ),
-                              ),
-                              if (!kIsWeb)
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  controller: topController,
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    children: List.generate(count, (index) {
-                                      if (bytes == null) {
-                                        return Container();
-                                      }
-                                      return GestureDetector(
-                                        onVerticalDragStart: (detalis) {
-                                          panelController.expand();
-                                          //print(detalis.primaryVelocity);
-                                        },
-                                        onLongPress: () async {
-                                          if (!widget.isMultiple) {
-                                            return;
-                                          }
+                                if (!kIsWeb)
+                                  SingleChildScrollView(
+                                    scrollDirection: Axis.horizontal,
+                                    controller: topController,
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.start,
+                                      children: List.generate(count, (index) {
+                                        if (bytes == null && false) {
+                                          return Container();
+                                        }
+                                        return GestureDetector(
+                                          onVerticalDragStart: (detalis) {
+                                            panelController.expand();
+                                            //print(detalis.primaryVelocity);
+                                          },
+                                          onLongPress: () async {
+                                            if (!widget.isMultiple) {
+                                              return;
+                                            }
 
-                                          if (indexList.contains(index)) {
-                                            setState(() {
-                                              indexList.remove(index);
-                                            });
-                                          } else {
-                                            setState(() {
-                                              indexList.add(index);
-                                            });
-                                          }
-                                        },
-                                        onTap: () async {
-                                          if (indexList.isEmpty) {
-                                            File file = await imageMedium
-                                                .elementAt(index)
-                                                .getFile();
-                                            compress([file]);
-                                          } else {
                                             if (indexList.contains(index)) {
                                               setState(() {
                                                 indexList.remove(index);
@@ -332,182 +358,207 @@ class CameraAppState extends State<CameraApp> {
                                                 indexList.add(index);
                                               });
                                             }
-                                          }
-                                        },
-                                        child: Stack(
-                                          children: [
-                                            Container(
-                                              width: 80,
-                                              height: 80,
-                                              margin: const EdgeInsets.only(
-                                                  left: 2),
-                                              child: FadeInImage(
-                                                  fit: BoxFit.cover,
-                                                  placeholder:
-                                                      MemoryImage(bytes!),
-                                                  image: ThumbnailProvider(
-                                                      mediumId: imageMedium
-                                                          .elementAt(index)
-                                                          .id,
-                                                      mediumType:
-                                                          MediumType.image,
-                                                      width: 128,
-                                                      height: 128,
-                                                      highQuality: false)),
-                                            ),
-                                            if (indexList.contains(index))
+                                          },
+                                          onTap: () async {
+                                            if (indexList.isEmpty) {
+                                              File file = await imageMedium
+                                                  .elementAt(index)
+                                                  .getFile();
+                                              compress([file]);
+                                            } else {
+                                              if (indexList.contains(index)) {
+                                                setState(() {
+                                                  indexList.remove(index);
+                                                });
+                                              } else {
+                                                setState(() {
+                                                  indexList.add(index);
+                                                });
+                                              }
+                                            }
+                                          },
+                                          child: Stack(
+                                            children: [
                                               Container(
                                                 width: 80,
                                                 height: 80,
                                                 margin: const EdgeInsets.only(
                                                     left: 2),
-                                                color: Colors.grey
-                                                    .withOpacity(0.4),
-                                                child: const Center(
-                                                  child: Icon(
-                                                    Icons.check,
-                                                    color: Colors.white,
+                                                child: FadeInImage(
+                                                    fit: BoxFit.cover,
+                                                    placeholder: AssetImage(
+                                                        "assets/images/ss.png"),
+                                                    image: ThumbnailProvider(
+                                                        mediumId: imageMedium
+                                                            .elementAt(index)
+                                                            .id,
+                                                        mediumType:
+                                                            MediumType.image,
+                                                        width: 128,
+                                                        height: 128,
+                                                        highQuality: false)),
+                                              ),
+                                              if (indexList.contains(index))
+                                                Container(
+                                                  width: 80,
+                                                  height: 80,
+                                                  margin: const EdgeInsets.only(
+                                                      left: 2),
+                                                  color: Colors.grey
+                                                      .withOpacity(0.4),
+                                                  child: const Center(
+                                                    child: Icon(
+                                                      Icons.check,
+                                                      color: Colors.white,
+                                                    ),
                                                   ),
-                                                ),
-                                              )
-                                          ],
-                                        ),
-                                      );
-                                    }),
+                                                )
+                                            ],
+                                          ),
+                                        );
+                                      }),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          Expanded(
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                (!kIsWeb)
+                                    ? IconButton(
+                                        onPressed: () async {
+                                          final ImagePicker picker0 =
+                                              ImagePicker();
+                                          if (!widget.isMultiple) {
+                                            final XFile? image =
+                                                await picker0.pickImage(
+                                                    source:
+                                                        ImageSource.gallery);
+                                            if (image == null) {
+                                              return;
+                                            }
+                                            File file = File(image.path);
+                                            compress([file]);
+                                          } else {
+                                            final List<XFile> images =
+                                                await picker0.pickMultiImage();
+                                            if (images.isEmpty) {
+                                              return;
+                                            }
+                                            List<File> file = [];
+                                            for (var element in images) {
+                                              file.add(File(element.path));
+                                            }
+                                            compress(file);
+                                          }
+                                        },
+                                        icon: const Icon(Icons.file_open,
+                                            size: 30, color: Colors.white))
+                                    : Container(),
+                                GestureDetector(
+                                  onTap: () async {
+                                    XFile file2 =
+                                        await controller!.takePicture();
+                                    File file = File(file2.path);
+                                    if (!kIsWeb) {
+                                      // Uint8List dataFile =
+                                      //     await file.readAsBytes();
+                                      // String fileName = DateTime.now()
+                                      //     .millisecondsSinceEpoch
+                                      //     .toString();
+                                      // await ImageGallerySaver.saveImage(dataFile,
+                                      //     quality: 100,
+                                      //     name: "$fileName.png",
+                                      //     isReturnImagePathOfIOS: true);
+                                    }
+
+                                    compress([file]);
+                                  },
+                                  child: Container(
+                                    width: 75,
+                                    height: 75,
+                                    decoration: BoxDecoration(
+                                        // color: Colors.white,
+                                        borderRadius: const BorderRadius.all(
+                                            Radius.circular(
+                                                50) //                 <--- border radius here
+                                            ),
+                                        border: Border.all(
+                                            color: Colors.white, width: 3)),
                                   ),
                                 ),
-                            ],
-                          ),
-                        Expanded(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              (!kIsWeb)
-                                  ? IconButton(
-                                      onPressed: () async {
-                                        final ImagePicker picker0 =
-                                            ImagePicker();
-                                        if (!widget.isMultiple) {
-                                          final XFile? image =
-                                              await picker0.pickImage(
-                                                  source: ImageSource.gallery);
-                                          if (image == null) {
-                                            return;
+                                (!kIsWeb && (cameras.length > 1))
+                                    ? IconButton(
+                                        onPressed: () {
+                                          if (camIndex + 1 >= cameras.length) {
+                                            camIndex = 0;
+                                          } else {
+                                            camIndex++;
                                           }
-                                          File file = File(image.path);
-                                          compress([file]);
-                                        } else {
-                                          final List<XFile> images =
-                                              await picker0.pickMultiImage();
-                                          if (images.isEmpty) {
-                                            return;
-                                          }
-                                          List<File> file = [];
-                                          for (var element in images) {
-                                            file.add(File(element.path));
-                                          }
-                                          compress(file);
-                                        }
-                                      },
-                                      icon: const Icon(Icons.file_open,
-                                          size: 30, color: Colors.white))
-                                  : Container(),
-                              GestureDetector(
-                                onTap: () async {
-                                  XFile file2 = await controller!.takePicture();
-                                  File file = File(file2.path);
-                                  if (!kIsWeb) {
-                                    Uint8List dataFile =
-                                        await file.readAsBytes();
-                                    String fileName = DateTime.now()
-                                        .millisecondsSinceEpoch
-                                        .toString();
-                                    await ImageGallerySaver.saveImage(dataFile,
-                                        quality: 100,
-                                        name: "$fileName.jpg",
-                                        isReturnImagePathOfIOS: true);
-                                  }
-                                  compress([file]);
-                                },
-                                child: Container(
-                                  width: 75,
-                                  height: 75,
-                                  decoration: BoxDecoration(
-                                      // color: Colors.white,
-                                      borderRadius: const BorderRadius.all(
-                                          Radius.circular(
-                                              50) //                 <--- border radius here
-                                          ),
-                                      border: Border.all(
-                                          color: Colors.white, width: 3)),
-                                ),
-                              ),
-                              (!kIsWeb && (cameras.length > 1))
-                                  ? IconButton(
-                                      onPressed: () {
-                                        if (camIndex + 1 >= cameras.length) {
-                                          camIndex = 0;
-                                        } else {
-                                          camIndex++;
-                                        }
-                                        controller = CameraController(
-                                            cameras[camIndex],
-                                            ResolutionPreset.veryHigh);
-                                        controller!.initialize().then((_) {
-                                          if (!mounted) {
-                                            return;
-                                          }
-                                          setState(() {});
-                                        });
-                                      },
-                                      icon: const Icon(
-                                          Icons.cameraswitch_outlined,
-                                          size: 30,
-                                          color: Colors.white))
-                                  : Container()
-                            ],
-                          ),
-                        )
-                      ],
+                                          controller = CameraController(
+                                              cameras[camIndex],
+                                              ResolutionPreset.veryHigh);
+                                          controller!.initialize().then((_) {
+                                            if (!mounted) {
+                                              return;
+                                            }
+                                            setState(() {});
+                                          });
+                                        },
+                                        icon: const Icon(
+                                            Icons.cameraswitch_outlined,
+                                            size: 30,
+                                            color: Colors.white))
+                                    : Container()
+                              ],
+                            ),
+                          )
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                SafeArea(
-                  child: Align(
-                      alignment: Alignment.topCenter,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          IconButton(
-                              onPressed: () {
-                                setState(() {
-                                  flashOn = !flashOn;
-                                  if (flashOn) {
-                                    controller!.setFlashMode(FlashMode.torch);
-                                  } else {
-                                    controller!.setFlashMode(FlashMode.off);
-                                  }
-                                });
-                              },
-                              icon: const Icon(Icons.flash_off,
-                                  size: 30, color: Colors.white)),
-                          IconButton(
-                              onPressed: () {
-                                compress([]);
-                              },
-                              icon: const Icon(
-                                Icons.close_rounded,
-                                color: Colors.white,
-                              ))
-                        ],
-                      )),
-                ),
-              ],
+                  SafeArea(
+                    child: Align(
+                        alignment: Alignment.topCenter,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            IconButton(
+                                onPressed: () {
+                                  setState(() {
+                                    flashOn = !flashOn;
+                                    if (flashOn) {
+                                      controller!.setFlashMode(FlashMode.torch);
+                                    } else {
+                                      controller!.setFlashMode(FlashMode.off);
+                                    }
+                                  });
+                                },
+                                icon: Icon(
+                                    flashOn ?? false
+                                        ? Icons.flash_on
+                                        : Icons.flash_off,
+                                    size: 30,
+                                    color: Colors.white)),
+                            IconButton(
+                                onPressed: () {
+                                  compress([]);
+                                },
+                                icon: const Icon(
+                                  Icons.close_rounded,
+                                  color: Colors.white,
+                                ))
+                          ],
+                        )),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    });
   }
 
   onSettingCallback() {
@@ -526,6 +577,8 @@ class CameraAppState extends State<CameraApp> {
       String pathString = "$trimmed/$dateTimeString.jpg";
       File fileNew = File(pathString);
       fileNew.writeAsBytesSync(List.from(blobBytes!));
+      File fileR =
+          await FlutterExifRotation.rotateAndSaveImage(path: fileNew.path);
       files2.add(fileNew);
     }
     if (context.mounted) {
