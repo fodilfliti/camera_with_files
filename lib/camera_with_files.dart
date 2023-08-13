@@ -1,12 +1,10 @@
 library camera_with_files;
 
 import 'dart:async';
-import 'dart:developer';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_sliding_up_panel/flutter_sliding_up_panel.dart';
