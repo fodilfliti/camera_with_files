@@ -149,7 +149,7 @@ class CameraAppState extends State<CameraApp> {
       PermissionStatus status3 = await Permission.mediaLibrary.request();
       return status4.isGranted &&
           // status.isGranted &&
-          status2.isGranted &&
+          // status2.isGranted &&
           status3.isGranted;
     }
     return false;
