@@ -20,7 +20,7 @@ dependencies:
   path_provider: ^2.0.9
   flutter_screenutil: ^5.8.4
   flutter_exif_rotation: ^0.5.1
-  image_picker: ^0.8.5+3
+  image_picker: ^1.0.2
   
 dev_dependencies:
   flutter_test:
