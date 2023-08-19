@@ -13,7 +13,7 @@ import 'package:photo_gallery/photo_gallery.dart';
 import 'package:image_picker/image_picker.dart';
 import "package:intl/intl.dart";
 import 'package:path_provider/path_provider.dart';
-import 'package:flutter_exif_rotation/flutter_exif_rotation.dart';
+// import 'package:flutter_exif_rotation/flutter_exif_rotation.dart';
 
 class CameraApp extends StatefulWidget {
   final bool isMultiple;
@@ -74,7 +74,7 @@ class CameraAppState extends State<CameraApp> {
     cameras = await availableCameras();
     controller = CameraController(
       cameras[0],
-      ResolutionPreset.high,
+      ResolutionPreset.medium,
       imageFormatGroup: Platform.isIOS ? ImageFormatGroup.bgra8888 : null,
     );
 
@@ -567,20 +567,19 @@ class CameraAppState extends State<CameraApp> {
 
   compress(List<File> files) async {
     List<File> files2 = [];
-    for (File file in files) {
-      Uint8List? blobBytes = await testCompressFile(file);
-      var dir = await getTemporaryDirectory();
-      String trimmed = dir.absolute.path;
-      String dateTimeString = DateTime.now().millisecondsSinceEpoch.toString();
-      String pathString = "$trimmed/$dateTimeString.jpg";
-      File fileNew = File(pathString);
-      fileNew.writeAsBytesSync(List.from(blobBytes!));
-      File fileR =
-          await FlutterExifRotation.rotateAndSaveImage(path: fileNew.path);
-      files2.add(fileNew);
-    }
+    // for (File file in files) {
+    //   // Uint8List? blobBytes = await testCompressFile(file);
+    //   // var dir = await getTemporaryDirectory();
+    //   // String trimmed = dir.absolute.path;
+    //   // String dateTimeString = DateTime.now().millisecondsSinceEpoch.toString();
+    //   // String pathString = "$trimmed/$dateTimeString.jpg";
+    //   // File fileNew = File(pathString);
+    //   // fileNew.writeAsBytesSync(List.from(blobBytes!));
+
+    //   files2.add(fileNew);
+    // }
     if (context.mounted) {
-      Navigator.of(context).pop(files2);
+      Navigator.of(context).pop(files);
     }
   }
 
