@@ -480,10 +480,12 @@ class CameraAppState extends State<CameraApp> {
                                   width: 75,
                                   height: 75,
                                   padding: EdgeInsets.all(4),
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    backgroundColor: Colors.transparent,
-                                  ),
+                                  child: send
+                                      ? CircularProgressIndicator(
+                                          color: Colors.white,
+                                          backgroundColor: Colors.transparent,
+                                        )
+                                      : SizedBox(),
                                   decoration: BoxDecoration(
                                       // color: Colors.white,
                                       borderRadius: const BorderRadius.all(
@@ -491,7 +493,10 @@ class CameraAppState extends State<CameraApp> {
                                               50) //                 <--- border radius here
                                           ),
                                       border: Border.all(
-                                          color: Colors.white, width: 3)),
+                                          color: send
+                                              ? Colors.transparent
+                                              : Colors.white,
+                                          width: 3)),
                                 ),
                               ),
                             ),
