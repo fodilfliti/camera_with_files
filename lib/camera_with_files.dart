@@ -42,6 +42,7 @@ class CameraAppState extends State<CameraApp> {
   List<File> results = [];
   List<int> indexList = [];
   bool flashOn = false;
+  bool send = false;
   int camIndex = 0;
   bool showPerformance = false;
   late double width;
@@ -449,35 +450,49 @@ class CameraAppState extends State<CameraApp> {
                                     icon: const Icon(Icons.file_open,
                                         size: 30, color: Colors.white))
                                 : Container(),
-                            GestureDetector(
-                              onTap: () async {
-                                XFile file2 = await controller!.takePicture();
-                                File file = File(file2.path);
-                                if (!kIsWeb) {
-                                  // Uint8List dataFile =
-                                  //     await file.readAsBytes();
-                                  // String fileName = DateTime.now()
-                                  //     .millisecondsSinceEpoch
-                                  //     .toString();
-                                  // await ImageGallerySaver.saveImage(dataFile,
-                                  //     quality: 100,
-                                  //     name: "$fileName.png",
-                                  //     isReturnImagePathOfIOS: true);
-                                }
+                            IgnorePointer(
+                              ignoring: send,
+                              child: GestureDetector(
+                                onTap: () async {
+                                  setState(() {
+                                    send = true;
+                                  });
+                                  XFile file2 = await controller!.takePicture();
+                                  File file = File(file2.path);
+                                  if (!kIsWeb) {
+                                    // Uint8List dataFile =
+                                    //     await file.readAsBytes();
+                                    // String fileName = DateTime.now()
+                                    //     .millisecondsSinceEpoch
+                                    //     .toString();
+                                    // await ImageGallerySaver.saveImage(dataFile,
+                                    //     quality: 100,
+                                    //     name: "$fileName.png",
+                                    //     isReturnImagePathOfIOS: true);
+                                  }
 
-                                compress([file]);
-                              },
-                              child: Container(
-                                width: 75,
-                                height: 75,
-                                decoration: BoxDecoration(
-                                    // color: Colors.white,
-                                    borderRadius: const BorderRadius.all(
-                                        Radius.circular(
-                                            50) //                 <--- border radius here
-                                        ),
-                                    border: Border.all(
-                                        color: Colors.white, width: 3)),
+                                  compress([file]);
+                                  setState(() {
+                                    send = false;
+                                  });
+                                },
+                                child: Container(
+                                  width: 75,
+                                  height: 75,
+                                  padding: EdgeInsets.all(4),
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    backgroundColor: Colors.transparent,
+                                  ),
+                                  decoration: BoxDecoration(
+                                      // color: Colors.white,
+                                      borderRadius: const BorderRadius.all(
+                                          Radius.circular(
+                                              50) //                 <--- border radius here
+                                          ),
+                                      border: Border.all(
+                                          color: Colors.white, width: 3)),
+                                ),
                               ),
                             ),
                             (!kIsWeb && (cameras.length > 1))
@@ -490,7 +505,7 @@ class CameraAppState extends State<CameraApp> {
                                       }
                                       controller = CameraController(
                                           cameras[camIndex],
-                                          ResolutionPreset.veryHigh);
+                                          ResolutionPreset.high);
                                       controller!.initialize().then((_) {
                                         if (!mounted) {
                                           return;
