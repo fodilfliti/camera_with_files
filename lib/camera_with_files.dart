@@ -75,7 +75,7 @@ class CameraAppState extends State<CameraApp> {
     cameras = await availableCameras();
     controller = CameraController(
       cameras[0],
-      ResolutionPreset.high,
+      ResolutionPreset.medium,
       imageFormatGroup: Platform.isIOS ? ImageFormatGroup.bgra8888 : null,
     );
 
@@ -510,7 +510,7 @@ class CameraAppState extends State<CameraApp> {
                                       }
                                       controller = CameraController(
                                           cameras[camIndex],
-                                          ResolutionPreset.high);
+                                          ResolutionPreset.medium);
                                       controller!.initialize().then((_) {
                                         if (!mounted) {
                                           return;
