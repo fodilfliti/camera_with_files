@@ -13,6 +13,7 @@ import 'package:photo_gallery/photo_gallery.dart';
 import 'package:image_picker/image_picker.dart';
 import "package:intl/intl.dart";
 import 'package:path_provider/path_provider.dart';
+import 'package:screenshot/screenshot.dart';
 // import 'package:flutter_exif_rotation/flutter_exif_rotation.dart';
 
 class CameraApp extends StatefulWidget {
@@ -200,6 +201,8 @@ class CameraAppState extends State<CameraApp> {
     });
   }
 
+  ScreenshotController screenshotController = ScreenshotController();
+
   @override
   void dispose() {
     controller?.dispose();
@@ -258,19 +261,22 @@ class CameraAppState extends State<CameraApp> {
               : null,
           body: Stack(
             children: [
-              GestureDetector(
-                // onHorizontalDragStart: (detalis) {
-                //   panelController.expand();
-                //   //print(detalis.primaryVelocity);
-                // },
-                onVerticalDragStart: (e) {
-                  panelController.expand();
-                },
-                child: Transform.scale(
-                  scale: scale,
-                  child: Center(
-                    child: CameraPreview(
-                      controller!,
+              Screenshot(
+                controller: screenshotController,
+                child: GestureDetector(
+                  // onHorizontalDragStart: (detalis) {
+                  //   panelController.expand();
+                  //   //print(detalis.primaryVelocity);
+                  // },
+                  onVerticalDragStart: (e) {
+                    panelController.expand();
+                  },
+                  child: Transform.scale(
+                    scale: scale,
+                    child: Center(
+                      child: CameraPreview(
+                        controller!,
+                      ),
                     ),
                   ),
                 ),
@@ -457,8 +463,17 @@ class CameraAppState extends State<CameraApp> {
                                   setState(() {
                                     send = true;
                                   });
-                                  XFile file2 = await controller!.takePicture();
-                                  File file = File(file2.path);
+                                  final image =
+                                      await screenshotController.capture();
+                                  if (image == null) return null;
+                                  final directory =
+                                      await getApplicationDocumentsDirectory();
+                                  final imagePath =
+                                      await File('${directory.path}/image.png')
+                                          .create();
+                                  await imagePath.writeAsBytes(image);
+                                  // XFile file2 = await controller!.takePicture();
+                                  File file = File(imagePath.path);
                                   if (!kIsWeb) {
                                     // Uint8List dataFile =
                                     //     await file.readAsBytes();
