@@ -76,7 +76,7 @@ class CameraAppState extends State<CameraApp> {
     cameras = await availableCameras();
     controller = CameraController(
       cameras[0],
-      ResolutionPreset.high,
+      ResolutionPreset.low,
       imageFormatGroup: Platform.isIOS ? ImageFormatGroup.bgra8888 : null,
     );
 
@@ -463,17 +463,17 @@ class CameraAppState extends State<CameraApp> {
                                   setState(() {
                                     send = true;
                                   });
-                                  final image =
-                                      await screenshotController.capture();
-                                  if (image == null) return null;
-                                  final directory =
-                                      await getApplicationDocumentsDirectory();
-                                  final imagePath =
-                                      await File('${directory.path}/image.png')
-                                          .create();
-                                  await imagePath.writeAsBytes(image);
-                                  // XFile file2 = await controller!.takePicture();
-                                  File file = File(imagePath.path);
+                                  // final image =
+                                  //     await screenshotController.capture();
+                                  // if (image == null) return null;
+                                  // final directory =
+                                  //     await getApplicationDocumentsDirectory();
+                                  // final imagePath =
+                                  //     await File('${directory.path}/image.png')
+                                  //         .create();
+                                  // await imagePath.writeAsBytes(image);
+                                  XFile file2 = await controller!.takePicture();
+                                  File file = File(file2.path);
                                   if (!kIsWeb) {
                                     // Uint8List dataFile =
                                     //     await file.readAsBytes();
@@ -525,7 +525,7 @@ class CameraAppState extends State<CameraApp> {
                                       }
                                       controller = CameraController(
                                           cameras[camIndex],
-                                          ResolutionPreset.high);
+                                          ResolutionPreset.low);
                                       controller!.initialize().then((_) {
                                         if (!mounted) {
                                           return;
